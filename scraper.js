@@ -1,42 +1,54 @@
 // scraper.js
-const axios = require('axios');
-const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 const fs = require('fs');
 
-// Change the URL as needed — this one is for tomatoes in Bangalore
-const url = 'https://agmarknet.gov.in/SearchCmmMkt.aspx?...'; // Replace with real final URL
-
 async function fetchAPMCPrices() {
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+
+    // ✅ Use your desired APMC search result URL (with actual filters)
+    const url = 'https://agmarknet.gov.in/SearchCmmMkt.aspx';
+
     try {
-        const response = await axios.get(url);
-        const $ = cheerio.load(response.data);
+        await page.goto(url, { waitUntil: 'networkidle2' });
 
-        let prices = [];
+        // Optionally fill form or apply filters here (if needed)
 
-        $('table#cphBody_GridPriceData tr').each((index, row) => {
-            const columns = $(row).find('td');
-            if (columns.length > 0) {
-                prices.push({
-                    date: $(columns[0]).text().trim(),
-                    market: $(columns[1]).text().trim(),
-                    commodity: $(columns[2]).text().trim(),
-                    variety: $(columns[3]).text().trim(),
-                    grade: $(columns[4]).text().trim(),
-                    minPrice: $(columns[5]).text().trim(),
-                    maxPrice: $(columns[6]).text().trim(),
-                    modalPrice: $(columns[7]).text().trim()
-                });
-            }
+        // Wait for the table to load
+        await page.waitForSelector('#cphBody_GridPriceData');
+
+        const prices = await page.evaluate(() => {
+            const data = [];
+            const rows = document.querySelectorAll('#cphBody_GridPriceData tr');
+
+            rows.forEach((row, index) => {
+                const columns = row.querySelectorAll('td');
+                if (columns.length > 0) {
+                    data.push({
+                        date: columns[0].innerText.trim(),
+                        market: columns[1].innerText.trim(),
+                        commodity: columns[2].innerText.trim(),
+                        variety: columns[3].innerText.trim(),
+                        grade: columns[4].innerText.trim(),
+                        minPrice: columns[5].innerText.trim(),
+                        maxPrice: columns[6].innerText.trim(),
+                        modalPrice: columns[7].innerText.trim(),
+                    });
+                }
+            });
+
+            return data;
         });
 
         fs.writeFileSync('apmcData.json', JSON.stringify(prices, null, 2));
         console.log('✅ APMC data saved to apmcData.json');
     } catch (error) {
-        console.error('❌ Error fetching APMC data:', error.message);
+        console.error('❌ Scraper error:', error.message);
+    } finally {
+        await browser.close();
     }
 }
 
-// Only run when called directly
 if (require.main === module) {
     fetchAPMCPrices();
 }

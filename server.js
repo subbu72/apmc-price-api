@@ -18,12 +18,17 @@ function readApmcData() {
     }
 }
 
-/** GET /apmc  →  returns latest prices */
+/** GET / → returns latest prices (default route) */
+app.get('/', (req, res) => {
+    res.json(readApmcData());
+});
+
+/** GET /apmc → returns latest prices (alternate route) */
 app.get('/apmc', (req, res) => {
     res.json(readApmcData());
 });
 
-/** GET /run-scraper  →  triggers scraper.js manually */
+/** GET /run-scraper → triggers scraper.js manually */
 app.get('/run-scraper', async (req, res) => {
     try {
         const runScraper = require('./scraper'); // scraper exports async fn
