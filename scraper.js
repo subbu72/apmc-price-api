@@ -1,27 +1,29 @@
 // scraper.js
 const puppeteer = require('puppeteer');
 const fs = require('fs');
+const { parse } = require('json2csv');
 
 async function fetchAPMCPrices() {
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
     const page = await browser.newPage();
 
-    // ✅ Use your desired APMC search result URL (with actual filters)
     const url = 'https://agmarknet.gov.in/SearchCmmMkt.aspx';
 
     try {
         await page.goto(url, { waitUntil: 'networkidle2' });
 
-        // Optionally fill form or apply filters here (if needed)
+        // TODO: Automate form selection (State, District, Commodity) here
 
-        // Wait for the table to load
+        // Wait for table
         await page.waitForSelector('#cphBody_GridPriceData');
 
         const prices = await page.evaluate(() => {
             const data = [];
             const rows = document.querySelectorAll('#cphBody_GridPriceData tr');
-
-            rows.forEach((row, index) => {
+            rows.forEach((row) => {
                 const columns = row.querySelectorAll('td');
                 if (columns.length > 0) {
                     data.push({
@@ -36,12 +38,17 @@ async function fetchAPMCPrices() {
                     });
                 }
             });
-
             return data;
         });
 
+        // Save JSON
         fs.writeFileSync('apmcData.json', JSON.stringify(prices, null, 2));
-        console.log('✅ APMC data saved to apmcData.json');
+
+        // Save CSV
+        const csv = parse(prices);
+        fs.writeFileSync('apmc.csv', csv);
+
+        console.log('✅ Saved apmcData.json and apmc.csv');
     } catch (error) {
         console.error('❌ Scraper error:', error.message);
     } finally {
